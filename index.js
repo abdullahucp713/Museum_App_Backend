@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const dbConnect = require('./config/db.js');
 const errorHandler = require('./middleware/errorMiddleware.js');
-const serverless = require('serverless-http');
+// const serverless = require('serverless-http');
 
 const authRoutes = require("./routes/authRoute.js");
 const eventRoutes = require("./routes/eventRoutes.js");
@@ -38,9 +38,9 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Error Handler (must be after routes)
-// app.use(errorHandler);
-// app.listen(PORT, () => {
-//     console.log(`Server is listening at port ${PORT}`)
-// });
+app.use(errorHandler);
+app.listen(PORT, () => {
+    console.log(`Server is listening at port ${PORT}`)
+});
 
-module.exports.handler = serverless(app);
+// module.exports.handler = serverless(app);
