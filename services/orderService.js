@@ -3,7 +3,10 @@ const eventRepository = require("../repositories/eventRepository");
 const Order = require("../models/OrderModel");
 const ErrorResponse = require("../utils/errorResponse");
 const { createPaymentIntent } = require("../utils/stripeService");
-const { v4: uuidv4 } = require("uuid");
+const crypto = require("crypto");
+
+// Use Node.js built-in crypto.randomUUID() instead of uuid package
+const uuidv4 = () => crypto.randomUUID();
 
 exports.findUserOrders = async (userId) => {
   let orders = await findByUserId(userId);
