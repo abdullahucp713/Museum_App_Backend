@@ -63,7 +63,7 @@ const initDBConnection = () => {
     });
 };
 
-const connectDB = (req, res, next) => {
+const connectDB = async (req, res, next) => {
   // Skip for health check and root - they already responded
   if (req.path === '/api/health' || req.path === '/') {
     return next();
@@ -74,10 +74,35 @@ const connectDB = (req, res, next) => {
     return next();
   }
 
-  // Start connection in background - don't wait
+  // For API routes that need DB, wait for connection
+  if (req.path.startsWith('/api/')) {
+    try {
+      // Wait for connection with timeout
+      if (!connectionPromise) {
+        connectionPromise = dbConnect();
+      }
+      
+      // Wait max 5 seconds for connection
+      await Promise.race([
+        connectionPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('DB connection timeout')), 5000)
+        )
+      ]);
+      
+      return next();
+    } catch (error) {
+      console.error('Database connection error:', error.message);
+      return res.status(503).json({
+        success: false,
+        error: 'Database connection failed. Please try again.',
+        message: error.message
+      });
+    }
+  }
+
+  // For other routes, continue without waiting
   initDBConnection();
-  
-  // Continue immediately
   next();
 };
 
