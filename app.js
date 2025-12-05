@@ -20,13 +20,7 @@ app.use(cors({
   maxAge: 86400
 }));
 
-// Handle OPTIONS preflight requests explicitly
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.sendStatus(200);
-});
+// OPTIONS requests are handled by CORS middleware above
 
 // Root route - immediate response
 app.get('/', (req, res) => {
