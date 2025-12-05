@@ -1,6 +1,36 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+
+// dotenv - load first
+dotenv.config();
+
+// App
+const app = express();
+
+// Middlewares
+app.use(cors());
+
+// IMPORTANT: Register health check routes FIRST, before loading any heavy dependencies
+// Root route - immediate response
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'Museum Ticket API is running',
+    version: '1.0.0'
+  });
+});
+
+// Health check endpoint - completely independent
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Now load routes and middleware (after health check routes are registered)
 const mongoose = require('mongoose');
 const dbConnect = require('./config/db.js');
 const errorHandler = require('./middleware/errorMiddleware.js');
@@ -10,85 +40,51 @@ const eventRoutes = require("./routes/eventRoutes.js");
 const orderRoutes = require("./routes/orderRoutes.js");
 const adminRoutes = require("./routes/adminRoutes.js");
 
-// dotenv
-dotenv.config();
-
-// App
-const app = express();
-
-// Middlewares
-app.use(cors());
-
-// Root route - immediate response (no DB, no middleware)
-app.get('/', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    message: 'Museum Ticket API is running',
-    version: '1.0.0'
-  });
-});
-
-// Health check endpoint (no DB required)
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    message: 'Server is running',
-    dbStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Database connection middleware - truly non-blocking for serverless
+// Database connection middleware - truly non-blocking
 let connectionPromise = null;
 
-// Initialize connection in background (non-blocking) - only on first request
 const initDBConnection = () => {
-  // Don't connect if already connected or connecting
   if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) {
-    return connectionPromise || Promise.resolve();
+    return;
   }
 
-  // Don't create new promise if one already exists
   if (connectionPromise) {
-    return connectionPromise;
+    return;
   }
 
-  // Start connection in background (non-blocking)
+  // Start connection in background - don't wait
   connectionPromise = dbConnect()
     .then(() => {
       console.log('DB connection established');
     })
     .catch(err => {
       console.error('Database connection error:', err.message);
-      connectionPromise = null; // Reset to allow retry after delay
+      connectionPromise = null;
     });
-
-  return connectionPromise;
 };
 
 const connectDB = (req, res, next) => {
-  // Skip DB connection for health check - immediate response
-  if (req.path === '/api/health') {
+  // Skip for health check and root - they already responded
+  if (req.path === '/api/health' || req.path === '/') {
     return next();
   }
 
-  // If already connected, proceed immediately
+  // If already connected, proceed
   if (mongoose.connection.readyState === 1) {
     return next();
   }
 
-  // Start connection in background (non-blocking)
-  // Don't wait for it - just start it and continue
+  // Start connection in background - don't wait
   initDBConnection();
   
-  // Continue immediately without waiting for connection
+  // Continue immediately
   next();
 };
 
-// Use DB connection middleware for all routes
+// DB middleware (will be skipped for health check)
 app.use(connectDB);
 
-// Stripe webhook needs raw body - capture it before JSON parsing
+// Stripe webhook needs raw body - before JSON parsing
 app.use('/api/orders/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '50mb' }));
