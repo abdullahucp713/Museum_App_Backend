@@ -1,7 +1,10 @@
 const mongoose = require('mongoose');
 
-// Cache the connection to reuse in serverless environments
-let cachedConnection = null;
+// Configure mongoose globally for serverless - enable command buffering
+mongoose.set('bufferCommands', true);
+mongoose.set('bufferMaxEntries', 0);
+
+let connectionPromise = null;
 
 const dbConnect = async () => {
   if (!process.env.MONGOURI) {
@@ -9,33 +12,39 @@ const dbConnect = async () => {
     return null;
   }
 
-  // If connection already exists and is connected, reuse it
+  // If already connected, return connection
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
 
-  try {
-    // Set connection options for serverless - optimized for fast connection
-    const options = {
-      maxPoolSize: 5,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 5000,
-      // Let mongoose buffer commands until connection is ready
-      bufferCommands: true,
-      bufferMaxEntries: 0,
-    };
-
-    await mongoose.connect(process.env.MONGOURI, options);
-    console.log("MongoDB connected successfully!");
-    
-    cachedConnection = mongoose.connection;
-    return cachedConnection;
-  } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
-    // Don't throw - let the app continue and retry later
-    return null;
+  // If connection is in progress, return that promise
+  if (connectionPromise) {
+    return connectionPromise;
   }
+
+  // Connection options optimized for serverless - very fast timeouts
+  const options = {
+    maxPoolSize: 2, // Smaller pool for serverless
+    minPoolSize: 1,
+    serverSelectionTimeoutMS: 3000, // Faster timeout
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 3000, // Faster timeout
+    heartbeatFrequencyMS: 10000,
+  };
+
+  // Start connection and cache promise
+  connectionPromise = mongoose.connect(process.env.MONGOURI, options)
+    .then(() => {
+      console.log("MongoDB connected successfully!");
+      return mongoose.connection;
+    })
+    .catch(error => {
+      console.error("MongoDB connection failed:", error.message);
+      connectionPromise = null; // Reset to allow retry
+      throw error;
+    });
+
+  return connectionPromise;
 };
 
 module.exports = dbConnect;

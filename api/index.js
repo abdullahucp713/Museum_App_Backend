@@ -1,6 +1,6 @@
 const serverless = require('serverless-http');
 
-// Lazy load handler
+// Lazy load handler - cached after first load
 let cachedHandler = null;
 
 const getHandler = () => {
@@ -34,7 +34,7 @@ module.exports = (req, res) => {
     });
   }
 
-  // For API routes, load and use handler
+  // For API routes, lazy load and use handler
   try {
     const handler = getHandler();
     return handler(req, res);

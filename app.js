@@ -11,7 +11,6 @@ const app = express();
 // Middlewares
 app.use(cors());
 
-// IMPORTANT: Register health check routes FIRST, before loading any heavy dependencies
 // Root route - immediate response
 app.get('/', (req, res) => {
   res.status(200).json({ 
@@ -30,20 +29,22 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Now load routes and middleware (after health check routes are registered)
+// Load mongoose and configure it
 const mongoose = require('mongoose');
 const dbConnect = require('./config/db.js');
 const errorHandler = require('./middleware/errorMiddleware.js');
 
+// Load routes
 const authRoutes = require("./routes/authRoute.js");
 const eventRoutes = require("./routes/eventRoutes.js");
 const orderRoutes = require("./routes/orderRoutes.js");
 const adminRoutes = require("./routes/adminRoutes.js");
 
 // Start DB connection in background (non-blocking)
+// Mongoose will buffer commands until connection is ready
 if (process.env.MONGOURI) {
-  dbConnect().catch(err => {
-    console.error('DB connection failed:', err.message);
+  dbConnect().catch(() => {
+    // Connection will happen when models are used
   });
 }
 
