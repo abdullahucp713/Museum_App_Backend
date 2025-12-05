@@ -1,7 +1,6 @@
 const serverless = require('serverless-http');
 
 // Lazy load handler - cached after first load
-// Pre-loading causes timeout on cold start, so we lazy load instead
 let cachedHandler = null;
 
 const getHandler = () => {
@@ -22,17 +21,22 @@ const getHandler = () => {
 };
 
 // Export handler
-module.exports = async (req, res) => {
-  // Set CORS headers for ALL responses FIRST
+module.exports = (req, res) => {
+  // CRITICAL: Handle OPTIONS FIRST - synchronous, no async/await
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.status(200).end();
+    return;
+  }
+  
+  // Set CORS headers for all other responses
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   res.setHeader('Access-Control-Max-Age', '86400');
-  
-  // Handle OPTIONS preflight requests IMMEDIATELY
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
   
   const path = req.url || req.path || '';
   
@@ -47,15 +51,6 @@ module.exports = async (req, res) => {
   }
 
   // For API routes, lazy load and use handler
-  try {
-    const handler = getHandler();
-    return await handler(req, res);
-  } catch (error) {
-    console.error('Error in handler:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Server initialization failed',
-      message: error.message
-    });
-  }
+  const handler = getHandler();
+  return handler(req, res);
 };
