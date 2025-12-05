@@ -40,79 +40,12 @@ const eventRoutes = require("./routes/eventRoutes.js");
 const orderRoutes = require("./routes/orderRoutes.js");
 const adminRoutes = require("./routes/adminRoutes.js");
 
-// Database connection middleware - truly non-blocking
-let connectionPromise = null;
-
-const initDBConnection = () => {
-  if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) {
-    return;
-  }
-
-  if (connectionPromise) {
-    return;
-  }
-
-  // Start connection in background - don't wait
-  connectionPromise = dbConnect()
-    .then(() => {
-      console.log('DB connection established');
-    })
-    .catch(err => {
-      console.error('Database connection error:', err.message);
-      connectionPromise = null;
-    });
-};
-
-const connectDB = async (req, res, next) => {
-  // Skip for health check and root
-  if (req.path === '/api/health' || req.path === '/') {
-    return next();
-  }
-
-  // If already connected, proceed
-  if (mongoose.connection.readyState === 1) {
-    return next();
-  }
-
-  // For API routes, ensure DB connection before proceeding
-  if (req.path.startsWith('/api/')) {
-    try {
-      // Start connection if not already started
-      if (!connectionPromise) {
-        connectionPromise = dbConnect();
-      }
-      
-      // Wait for connection (max 10 seconds timeout)
-      await Promise.race([
-        connectionPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Database connection timeout')), 10000)
-        )
-      ]);
-      
-      // Verify connection is ready
-      if (mongoose.connection.readyState !== 1) {
-        throw new Error('Database connection not ready');
-      }
-      
-      return next();
-    } catch (error) {
-      console.error('Database connection error:', error.message);
-      return res.status(503).json({
-        success: false,
-        error: 'Database connection failed. Please try again.',
-        message: error.message
-      });
-    }
-  }
-
-  // For other routes, continue without waiting
-  initDBConnection();
-  next();
-};
-
-// DB middleware (will be skipped for health check)
-app.use(connectDB);
+// Start DB connection in background (non-blocking)
+if (process.env.MONGOURI) {
+  dbConnect().catch(err => {
+    console.error('DB connection failed:', err.message);
+  });
+}
 
 // Stripe webhook needs raw body - before JSON parsing
 app.use('/api/orders/webhook', express.raw({ type: 'application/json' }));

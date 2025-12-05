@@ -1,6 +1,6 @@
 const serverless = require('serverless-http');
 
-// Minimal handler - lazy load app to avoid timeout
+// Lazy load handler
 let cachedHandler = null;
 
 const getHandler = () => {
@@ -20,11 +20,11 @@ const getHandler = () => {
   }
 };
 
-// Export handler with immediate response for health checks
+// Export handler
 module.exports = (req, res) => {
   const path = req.url || req.path || '';
   
-  // Handle health checks IMMEDIATELY - no app loading
+  // Handle health checks immediately without loading app
   if (path === '/' || path === '/api/health') {
     return res.status(200).json({
       status: 'OK',
@@ -34,7 +34,7 @@ module.exports = (req, res) => {
     });
   }
 
-  // For other routes, lazy load and use handler
+  // For API routes, load and use handler
   try {
     const handler = getHandler();
     return handler(req, res);
