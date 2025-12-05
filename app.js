@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 const dbConnect = require('./config/db.js');
 const errorHandler = require('./middleware/errorMiddleware.js');
 
@@ -15,11 +16,30 @@ dotenv.config();
 // App
 const app = express();
 
-// DB Connection - connect to database
-dbConnect();
-
 // Middlewares
 app.use(cors());
+
+// Database connection middleware - lazy connection for serverless
+const connectDB = async (req, res, next) => {
+  // Check if already connected
+  if (mongoose.connection.readyState === 1) {
+    return next();
+  }
+
+  // Try to connect
+  try {
+    await dbConnect();
+  } catch (error) {
+    console.error('Database connection error:', error);
+    // Don't block the request, let it continue
+    // Connection will be retried on next request
+  }
+  
+  next();
+};
+
+// Use DB connection middleware for all routes
+app.use(connectDB);
 
 // Stripe webhook needs raw body - capture it before JSON parsing
 app.use('/api/orders/webhook', express.raw({ type: 'application/json' }));

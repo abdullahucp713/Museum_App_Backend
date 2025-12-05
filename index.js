@@ -1,4 +1,5 @@
 const dotenv = require('dotenv');
+const dbConnect = require('./config/db.js');
 const app = require('./app.js');
 
 // dotenv
@@ -9,8 +10,14 @@ const PORT = process.env.PORT || 4000;
 
 // Start server for local development
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Server is listening at port ${PORT}`);
+  // Connect to database on startup for local development
+  dbConnect().then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server is listening at port ${PORT}`);
+    });
+  }).catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
   });
 }
 
