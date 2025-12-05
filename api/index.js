@@ -22,19 +22,22 @@ const getHandler = () => {
 
 // Export handler
 module.exports = async (req, res) => {
+  // CRITICAL: Set CORS headers FIRST for ALL responses
+  // This must happen before any other processing
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  
+  // Handle OPTIONS preflight requests IMMEDIATELY - before anything else
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   const path = req.url || req.path || '';
   
   // Handle health checks immediately without loading app
   if (path === '/' || path === '/api/health') {
-    // Set CORS headers for health checks
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
-    
     return res.status(200).json({
       status: 'OK',
       message: path === '/' ? 'Museum Ticket API is running' : 'Server is running',
@@ -44,17 +47,21 @@ module.exports = async (req, res) => {
   }
 
   // For API routes, lazy load and use handler
-  // The Express app will handle CORS via its middleware
+  // CORS middleware in app.js will also handle it
   try {
     const handler = getHandler();
-    return handler(req, res);
+    const result = await handler(req, res);
+    
+    // Ensure CORS headers are still set after handler execution
+    if (!res.headersSent) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    }
+    
+    return result;
   } catch (error) {
     console.error('Error in handler:', error);
-    // Set CORS headers even for errors
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    
     return res.status(500).json({
       success: false,
       error: 'Server initialization failed',
