@@ -22,14 +22,13 @@ const getHandler = () => {
 
 // Export handler
 module.exports = async (req, res) => {
-  // CRITICAL: Set CORS headers FIRST for ALL responses
-  // This must happen before any other processing
+  // Set CORS headers for ALL responses FIRST
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   res.setHeader('Access-Control-Max-Age', '86400');
   
-  // Handle OPTIONS preflight requests IMMEDIATELY - before anything else
+  // Handle OPTIONS preflight requests IMMEDIATELY
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -47,19 +46,9 @@ module.exports = async (req, res) => {
   }
 
   // For API routes, lazy load and use handler
-  // CORS middleware in app.js will also handle it
   try {
     const handler = getHandler();
-    const result = await handler(req, res);
-    
-    // Ensure CORS headers are still set after handler execution
-    if (!res.headersSent) {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    }
-    
-    return result;
+    return await handler(req, res);
   } catch (error) {
     console.error('Error in handler:', error);
     return res.status(500).json({
