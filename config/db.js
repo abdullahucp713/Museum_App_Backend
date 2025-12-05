@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 // Configure mongoose globally for serverless - enable command buffering
 mongoose.set('bufferCommands', true);
-mongoose.set('bufferMaxEntries', 0);
 
 let connectionPromise = null;
 
