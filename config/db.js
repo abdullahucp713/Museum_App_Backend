@@ -15,13 +15,17 @@ const dbConnect = async () => {
   }
 
   try {
-    // Set connection options for serverless
+    // Set connection options for serverless - optimized for fast connection
     const options = {
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
+      maxPoolSize: 5,
+      minPoolSize: 1,
+      serverSelectionTimeoutMS: 3000,
+      socketTimeoutMS: 30000,
+      connectTimeoutMS: 3000,
       bufferCommands: false,
       bufferMaxEntries: 0,
+      // Use direct connection for faster response
+      directConnection: false,
     };
 
     await mongoose.connect(process.env.MONGOURI, options);

@@ -19,46 +19,69 @@ const app = express();
 // Middlewares
 app.use(cors());
 
+// Root route - immediate response (no DB, no middleware)
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'Museum Ticket API is running',
+    version: '1.0.0'
+  });
+});
+
 // Health check endpoint (no DB required)
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     message: 'Server is running',
-    dbStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    dbStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Database connection middleware - lazy connection for serverless
-let isConnecting = false;
-const connectDB = async (req, res, next) => {
-  // Skip DB connection for health check
+// Database connection middleware - truly non-blocking for serverless
+let connectionPromise = null;
+
+// Initialize connection in background (non-blocking) - only on first request
+const initDBConnection = () => {
+  // Don't connect if already connected or connecting
+  if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) {
+    return connectionPromise || Promise.resolve();
+  }
+
+  // Don't create new promise if one already exists
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
+  // Start connection in background (non-blocking)
+  connectionPromise = dbConnect()
+    .then(() => {
+      console.log('DB connection established');
+    })
+    .catch(err => {
+      console.error('Database connection error:', err.message);
+      connectionPromise = null; // Reset to allow retry after delay
+    });
+
+  return connectionPromise;
+};
+
+const connectDB = (req, res, next) => {
+  // Skip DB connection for health check - immediate response
   if (req.path === '/api/health') {
     return next();
   }
 
-  // Check if already connected
+  // If already connected, proceed immediately
   if (mongoose.connection.readyState === 1) {
     return next();
   }
 
-  // If connection is in progress, wait a bit or continue
-  if (isConnecting) {
-    return next();
-  }
-
-  // Try to connect (non-blocking)
-  if (mongoose.connection.readyState === 0 && !isConnecting) {
-    isConnecting = true;
-    dbConnect()
-      .then(() => {
-        isConnecting = false;
-      })
-      .catch(err => {
-        console.error('Database connection error:', err.message);
-        isConnecting = false;
-      });
-  }
+  // Start connection in background (non-blocking)
+  // Don't wait for it - just start it and continue
+  initDBConnection();
   
+  // Continue immediately without waiting for connection
   next();
 };
 
