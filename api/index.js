@@ -1,22 +1,25 @@
 const serverless = require('serverless-http');
 
-// Pre-load app and handler at module level
-// Vercel will cache this between invocations, making subsequent requests faster
-let app;
-let handler;
+// Lazy load handler - cached after first load
+// Pre-loading causes timeout on cold start, so we lazy load instead
+let cachedHandler = null;
 
-try {
-  // Pre-load the app when the module is first loaded
-  app = require('../app.js');
-  handler = serverless(app, {
-    binary: ['image/*', 'application/pdf']
-  });
-  console.log('App pre-loaded successfully');
-} catch (error) {
-  console.error('Failed to pre-load app:', error);
-  // If pre-load fails, we'll lazy load on first request
-  handler = null;
-}
+const getHandler = () => {
+  if (cachedHandler) {
+    return cachedHandler;
+  }
+
+  try {
+    const app = require('../app.js');
+    cachedHandler = serverless(app, {
+      binary: ['image/*', 'application/pdf']
+    });
+    return cachedHandler;
+  } catch (error) {
+    console.error('Failed to load app:', error);
+    throw error;
+  }
+};
 
 // Export handler
 module.exports = async (req, res) => {
@@ -33,7 +36,7 @@ module.exports = async (req, res) => {
   
   const path = req.url || req.path || '';
   
-  // Handle health checks immediately without using handler
+  // Handle health checks immediately without loading app
   if (path === '/' || path === '/api/health') {
     return res.status(200).json({
       status: 'OK',
@@ -43,30 +46,15 @@ module.exports = async (req, res) => {
     });
   }
 
-  // Use pre-loaded handler or lazy load if pre-load failed
-  if (!handler) {
-    try {
-      app = require('../app.js');
-      handler = serverless(app, {
-        binary: ['image/*', 'application/pdf']
-      });
-    } catch (error) {
-      console.error('Error loading app:', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Server initialization failed',
-        message: error.message
-      });
-    }
-  }
-
+  // For API routes, lazy load and use handler
   try {
+    const handler = getHandler();
     return await handler(req, res);
   } catch (error) {
     console.error('Error in handler:', error);
     return res.status(500).json({
       success: false,
-      error: 'Request handling failed',
+      error: 'Server initialization failed',
       message: error.message
     });
   }

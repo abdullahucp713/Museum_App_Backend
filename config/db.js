@@ -23,15 +23,16 @@ const dbConnect = async () => {
 
   // Connection options optimized for serverless - very fast timeouts
   const options = {
-    maxPoolSize: 2, // Smaller pool for serverless
-    minPoolSize: 1,
-    serverSelectionTimeoutMS: 3000, // Faster timeout
+    maxPoolSize: 1, // Minimal pool for serverless
+    serverSelectionTimeoutMS: 2000, // Very fast timeout
     socketTimeoutMS: 45000,
-    connectTimeoutMS: 3000, // Faster timeout
+    connectTimeoutMS: 2000, // Very fast timeout
     heartbeatFrequencyMS: 10000,
+    // Don't wait for connection - mongoose will buffer
+    bufferCommands: true,
   };
 
-  // Start connection and cache promise
+  // Start connection and cache promise - don't wait for it
   connectionPromise = mongoose.connect(process.env.MONGOURI, options)
     .then(() => {
       console.log("MongoDB connected successfully!");
@@ -40,7 +41,8 @@ const dbConnect = async () => {
     .catch(error => {
       console.error("MongoDB connection failed:", error.message);
       connectionPromise = null; // Reset to allow retry
-      throw error;
+      // Don't throw - let mongoose buffer commands
+      return null;
     });
 
   return connectionPromise;
