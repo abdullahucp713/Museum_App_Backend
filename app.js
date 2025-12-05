@@ -64,7 +64,7 @@ const initDBConnection = () => {
 };
 
 const connectDB = async (req, res, next) => {
-  // Skip for health check and root - they already responded
+  // Skip for health check and root
   if (req.path === '/api/health' || req.path === '/') {
     return next();
   }
@@ -74,21 +74,26 @@ const connectDB = async (req, res, next) => {
     return next();
   }
 
-  // For API routes that need DB, wait for connection
+  // For API routes, ensure DB connection before proceeding
   if (req.path.startsWith('/api/')) {
     try {
-      // Wait for connection with timeout
+      // Start connection if not already started
       if (!connectionPromise) {
         connectionPromise = dbConnect();
       }
       
-      // Wait max 5 seconds for connection
+      // Wait for connection (max 10 seconds timeout)
       await Promise.race([
         connectionPromise,
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('DB connection timeout')), 5000)
+          setTimeout(() => reject(new Error('Database connection timeout')), 10000)
         )
       ]);
+      
+      // Verify connection is ready
+      if (mongoose.connection.readyState !== 1) {
+        throw new Error('Database connection not ready');
+      }
       
       return next();
     } catch (error) {
