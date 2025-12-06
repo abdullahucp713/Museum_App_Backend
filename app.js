@@ -9,7 +9,6 @@ dotenv.config();
 const app = express();
 
 // CORS Middleware - Allow all origins (wildcard)
-// Note: credentials must be false when using wildcard origin
 app.use(cors({
   origin: '*',
   credentials: false,
@@ -20,8 +19,6 @@ app.use(cors({
   maxAge: 86400
 }));
 
-// OPTIONS requests are handled by CORS middleware above
-
 // Root route - immediate response
 app.get('/', (req, res) => {
   res.status(200).json({ 
@@ -31,7 +28,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint - completely independent
+// Health check endpoint - for Render health checks
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
@@ -51,11 +48,11 @@ const eventRoutes = require("./routes/eventRoutes.js");
 const orderRoutes = require("./routes/orderRoutes.js");
 const adminRoutes = require("./routes/adminRoutes.js");
 
-// Start DB connection in background (non-blocking)
-// Mongoose will buffer commands until connection is ready
+// Start DB connection (for traditional server, we wait for connection)
 if (process.env.MONGOURI) {
-  dbConnect().catch(() => {
-    // Connection will happen when models are used
+  dbConnect().catch((error) => {
+    console.error('Initial DB connection attempt failed:', error.message);
+    // Server will still start, mongoose will retry when models are used
   });
 }
 

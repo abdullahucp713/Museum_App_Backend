@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Configure mongoose globally for serverless - enable command buffering
+// Configure mongoose globally - enable command buffering
 mongoose.set('bufferCommands', true);
 
 let connectionPromise = null;
@@ -8,11 +8,12 @@ let connectionPromise = null;
 const dbConnect = async () => {
   if (!process.env.MONGOURI) {
     console.error("MONGOURI environment variable is not set.");
-    return null;
+    throw new Error("MONGOURI environment variable is required");
   }
 
   // If already connected, return connection
   if (mongoose.connection.readyState === 1) {
+    console.log("Using existing MongoDB connection");
     return mongoose.connection;
   }
 
@@ -21,18 +22,17 @@ const dbConnect = async () => {
     return connectionPromise;
   }
 
-  // Connection options optimized for serverless - very fast timeouts
+  // Connection options optimized for production (Render uses traditional server)
   const options = {
-    maxPoolSize: 1, // Minimal pool for serverless
-    serverSelectionTimeoutMS: 2000, // Very fast timeout
+    maxPoolSize: 10, // Larger pool for traditional server
+    minPoolSize: 2,
+    serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
-    connectTimeoutMS: 2000, // Very fast timeout
+    connectTimeoutMS: 5000,
     heartbeatFrequencyMS: 10000,
-    // Don't wait for connection - mongoose will buffer
-    bufferCommands: true,
   };
 
-  // Start connection and cache promise - don't wait for it
+  // Start connection and cache promise
   connectionPromise = mongoose.connect(process.env.MONGOURI, options)
     .then(() => {
       console.log("MongoDB connected successfully!");
@@ -41,8 +41,7 @@ const dbConnect = async () => {
     .catch(error => {
       console.error("MongoDB connection failed:", error.message);
       connectionPromise = null; // Reset to allow retry
-      // Don't throw - let mongoose buffer commands
-      return null;
+      throw error;
     });
 
   return connectionPromise;
