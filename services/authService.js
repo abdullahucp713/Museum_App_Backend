@@ -8,13 +8,11 @@ const {
 const ErrorResponse = require("../utils/errorResponse");
 const sendEmail = require("../utils/emailUtil");
 const crypto = require("crypto");
-const { CLIENT_RENEG_LIMIT } = require("tls");
+// Removed unused import: const { CLIENT_RENEG_LIMIT } = require("tls");
 
 // Regiter Service
 exports.register = async (userData) => {
   const { email, adminKey } = userData;
-
-  console.log(adminKey === process.env.ADMIN_SECRET_KEY);
 
   const existingUser = await findByEmail(email);
 
@@ -26,15 +24,13 @@ exports.register = async (userData) => {
 
   const adminCount = await countAdmins();
 
-  // if (adminCount === 0) {
-    if (
-      adminKey &&
-      process.env.ADMIN_SECRET_KEY &&
-      adminKey === process.env.ADMIN_SECRET_KEY
-    ) {
-      roleToAssign = "admin";
-    }
-  // }
+  if (
+    adminKey &&
+    process.env.ADMIN_SECRET_KEY &&
+    adminKey === process.env.ADMIN_SECRET_KEY
+  ) {
+    roleToAssign = "admin";
+  }
 
   if (userData.adminKey) {
     delete userData.adminKey;
@@ -114,7 +110,6 @@ exports.forgotPassword = async (email) => {
   const existingUser = await findByEmail(email);
 
   if (!existingUser) {
-
     return true;
   }
 

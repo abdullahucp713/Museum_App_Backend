@@ -37,31 +37,41 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Load mongoose and configure it
+// Load mongoose (lightweight) - configure it
 const mongoose = require('mongoose');
+mongoose.set('bufferCommands', true);
+
+// Lazy load DB connection - don't connect until first DB request
 const dbConnect = require('./config/db.js');
-const errorHandler = require('./middleware/errorMiddleware.js');
 
-// Load routes
-const authRoutes = require("./routes/authRoute.js");
-const eventRoutes = require("./routes/eventRoutes.js");
-const orderRoutes = require("./routes/orderRoutes.js");
-const adminRoutes = require("./routes/adminRoutes.js");
-
-// Start DB connection in background (non-blocking for serverless)
-// Mongoose will buffer commands until connection is ready
-if (process.env.MONGOURI) {
-  dbConnect().catch((error) => {
-    console.error('Initial DB connection attempt failed:', error.message);
-    // Server will still start, mongoose will buffer commands
-  });
-}
+// Middleware to ensure DB connection for API routes (non-blocking)
+app.use((req, res, next) => {
+  // Skip DB connection for health checks
+  if (req.path === '/' || req.path === '/api/health') {
+    return next();
+  }
+  
+  // Start DB connection in background if not connected (non-blocking)
+  if (process.env.MONGOURI && mongoose.connection.readyState === 0) {
+    dbConnect().catch(() => {
+      // Mongoose will buffer commands until connection is ready
+    });
+  }
+  
+  next();
+});
 
 // Stripe webhook needs raw body - before JSON parsing
 app.use('/api/orders/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Lazy load routes (load only when needed - but routes are needed for all API calls)
+const authRoutes = require("./routes/authRoute.js");
+const eventRoutes = require("./routes/eventRoutes.js");
+const orderRoutes = require("./routes/orderRoutes.js");
+const adminRoutes = require("./routes/adminRoutes.js");
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -70,6 +80,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Error Handler (must be after routes)
+const errorHandler = require('./middleware/errorMiddleware.js');
 app.use(errorHandler);
 
 module.exports = app;

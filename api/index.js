@@ -9,6 +9,7 @@ const getHandler = () => {
   }
 
   try {
+    // Load app only when needed (lazy loading)
     const app = require('../app.js');
     cachedHandler = serverless(app, {
       binary: ['image/*', 'application/pdf']
@@ -22,7 +23,7 @@ const getHandler = () => {
 
 // Export handler
 module.exports = async (req, res) => {
-  // CRITICAL: Handle OPTIONS FIRST - synchronous, no async/await
+  // CRITICAL: Handle OPTIONS FIRST - completely synchronous
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
@@ -40,7 +41,7 @@ module.exports = async (req, res) => {
   
   const path = req.url || req.path || '';
   
-  // Handle health checks immediately without loading app
+  // Handle health checks immediately without loading ANY app code
   if (path === '/' || path === '/api/health') {
     return res.status(200).json({
       status: 'OK',
