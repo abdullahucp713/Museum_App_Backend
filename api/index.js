@@ -21,7 +21,7 @@ const getHandler = () => {
 };
 
 // Export handler
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   // CRITICAL: Handle OPTIONS FIRST - synchronous, no async/await
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -50,7 +50,15 @@ module.exports = (req, res) => {
     });
   }
 
-  // For API routes, lazy load and use handler
-  const handler = getHandler();
-  return handler(req, res);
+  try {
+    // For API routes, lazy load and use handler
+    const handler = getHandler();
+    return await handler(req, res);
+  } catch (error) {
+    console.error('Handler error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal Server Error'
+    });
+  }
 };

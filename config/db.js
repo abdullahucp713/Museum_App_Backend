@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Configure mongoose globally - enable command buffering
+// Configure mongoose globally for serverless - enable command buffering
 mongoose.set('bufferCommands', true);
 
 let connectionPromise = null;
@@ -8,12 +8,12 @@ let connectionPromise = null;
 const dbConnect = async () => {
   if (!process.env.MONGOURI) {
     console.error("MONGOURI environment variable is not set.");
-    throw new Error("MONGOURI environment variable is required");
+    // Don't throw in serverless - let mongoose buffer commands
+    return null;
   }
 
   // If already connected, return connection
   if (mongoose.connection.readyState === 1) {
-    console.log("Using existing MongoDB connection");
     return mongoose.connection;
   }
 
@@ -22,17 +22,17 @@ const dbConnect = async () => {
     return connectionPromise;
   }
 
-  // Connection options optimized for production (Render uses traditional server)
+  // Connection options optimized for Vercel serverless
   const options = {
-    maxPoolSize: 10, // Larger pool for traditional server
-    minPoolSize: 2,
-    serverSelectionTimeoutMS: 5000,
+    maxPoolSize: 1, // Minimal pool for serverless
+    serverSelectionTimeoutMS: 2000, // Fast timeout
     socketTimeoutMS: 45000,
-    connectTimeoutMS: 5000,
+    connectTimeoutMS: 2000, // Fast timeout
     heartbeatFrequencyMS: 10000,
+    bufferCommands: true, // Mongoose will buffer commands
   };
 
-  // Start connection and cache promise
+  // Start connection and cache promise - non-blocking for serverless
   connectionPromise = mongoose.connect(process.env.MONGOURI, options)
     .then(() => {
       console.log("MongoDB connected successfully!");
@@ -41,7 +41,8 @@ const dbConnect = async () => {
     .catch(error => {
       console.error("MongoDB connection failed:", error.message);
       connectionPromise = null; // Reset to allow retry
-      throw error;
+      // Don't throw - let mongoose buffer commands for serverless
+      return null;
     });
 
   return connectionPromise;

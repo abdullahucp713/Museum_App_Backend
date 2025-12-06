@@ -28,7 +28,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint - for Render health checks
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
@@ -48,11 +48,12 @@ const eventRoutes = require("./routes/eventRoutes.js");
 const orderRoutes = require("./routes/orderRoutes.js");
 const adminRoutes = require("./routes/adminRoutes.js");
 
-// Start DB connection (for traditional server, we wait for connection)
+// Start DB connection in background (non-blocking for serverless)
+// Mongoose will buffer commands until connection is ready
 if (process.env.MONGOURI) {
   dbConnect().catch((error) => {
     console.error('Initial DB connection attempt failed:', error.message);
-    // Server will still start, mongoose will retry when models are used
+    // Server will still start, mongoose will buffer commands
   });
 }
 
